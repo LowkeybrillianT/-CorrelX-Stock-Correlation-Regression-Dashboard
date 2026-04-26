@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CorrelX — Stock Correlation Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js" charset="utf-8"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-inner">
+    <div class="spinner-ring"></div>
+    <p class="loading-text" id="loadingText">Fetching market data…</p>
+  </div>
+</div>
+
+<!-- App Shell -->
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="14,1 27,7.5 27,20.5 14,27 1,20.5 1,7.5" fill="none" stroke="#00D4FF" stroke-width="1.5"/>
+          <polygon points="14,7 21,11 21,19 14,23 7,19 7,11" fill="#00D4FF" opacity="0.15"/>
+          <circle cx="14" cy="14" r="3" fill="#00D4FF"/>
+        </svg>
+        <span class="logo-text">Correl<em>X</em></span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- API Key -->
+      <div class="control-group" id="apiGroup">
+        <label class="control-label">
+          <span class="label-icon">🔑</span> Alpha Vantage API Key
+        </label>
+        <div class="api-input-row">
+          <input type="password" id="apiKeyInput" class="text-input" placeholder="Enter your API key…" autocomplete="off" />
+          <button class="icon-btn" id="apiToggleBtn" title="Show/Hide key">👁</button>
+        </div>
+        <p class="hint-text">
+          Free key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener">alphavantage.co</a>
+          — or use <button class="link-btn" id="demoModeBtn">Demo Mode</button>
+        </p>
+      </div>
+
+      <!-- Stock Selector -->
+      <div class="control-group">
+        <label class="control-label">
+          <span class="label-icon">📈</span> Stocks (2–5)
+        </label>
+        <div class="tag-input-wrap" id="tagInputWrap">
+          <div class="tags-container" id="tagsContainer"></div>
+          <input type="text" id="stockInput" class="tag-text-input" placeholder="Add ticker…" maxlength="10" />
+        </div>
+        <div class="quick-add-row">
+          <span class="hint-text">Quick add:</span>
+          <button class="quick-tag" data-sym="AAPL">AAPL</button>
+          <button class="quick-tag" data-sym="MSFT">MSFT</button>
+          <button class="quick-tag" data-sym="GOOGL">GOOGL</button>
+          <button class="quick-tag" data-sym="INFY">INFY</button>
+          <button class="quick-tag" data-sym="AMZN">AMZN</button>
+        </div>
+      </div>
+
+      <!-- Time Range -->
+      <div class="control-group">
+        <label class="control-label">
+          <span class="label-icon">📅</span> Time Range
+        </label>
+        <div class="segmented-ctrl" id="timeRangeCtrl">
+          <button class="seg-btn" data-range="1M">1M</button>
+          <button class="seg-btn" data-range="6M">6M</button>
+          <button class="seg-btn active" data-range="1Y">1Y</button>
+        </div>
+      </div>
+
+      <!-- Normalize Toggle -->
+      <div class="control-group">
+        <label class="toggle-label">
+          <span class="control-label"><span class="label-icon">⚖️</span> Normalize Prices</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="normalizeToggle" />
+            <span class="toggle-track"></span>
+          </label>
+        </label>
+        <p class="hint-text">Rebase all prices to 100 for fair comparison</p>
+      </div>
+
+      <!-- Scatter Pair Selector -->
+      <div class="control-group">
+        <label class="control-label">
+          <span class="label-icon">🔵</span> Scatter Pair
+        </label>
+        <div class="pair-selectors">
+          <select id="scatterX" class="select-input">
+            <option value="0">Stock A</option>
+          </select>
+          <span class="vs-label">vs</span>
+          <select id="scatterY" class="select-input">
+            <option value="1">Stock B</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-group">
+        <button class="btn btn-primary" id="analyzeBtn">
+          <span class="btn-icon">⚡</span> Analyze
+        </button>
+        <button class="btn btn-ghost" id="exportBtn" disabled>
+          <span class="btn-icon">⬇</span> Export CSV
+        </button>
+      </div>
+
+    </div><!-- /sidebar-body -->
+
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <span class="theme-icon" id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark Mode</span>
+      </button>
+      <span class="version-badge">v1.0.0</span>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main-content">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Market Correlation Studio</h1>
+        <p class="page-sub" id="lastUpdated">Select stocks and click Analyze to begin</p>
+      </div>
+      <div class="topbar-right">
+        <div class="status-pill" id="statusPill">
+          <span class="status-dot"></span>
+          <span id="statusText">Ready</span>
+        </div>
+        <div class="demo-badge hidden" id="demoBadge">DEMO DATA</div>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        <span class="stat-label">Stocks Analyzed</span>
+        <span class="stat-value" id="statStocks">—</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Data Points</span>
+        <span class="stat-value" id="statPoints">—</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Avg Correlation</span>
+        <span class="stat-value" id="statAvgCorr">—</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Date Range</span>
+        <span class="stat-value" id="statDateRange">—</span>
+      </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid" id="dashboardGrid">
+
+      <!-- Welcome / Empty State -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <path d="M8 48 L20 32 L32 38 L44 20 L56 28" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 48 L20 32 L32 38 L44 20 L56 28" stroke="#00D4FF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.07"/>
+            <circle cx="20" cy="32" r="4" fill="#00D4FF" opacity="0.6"/>
+            <circle cx="32" cy="38" r="4" fill="#FFB800" opacity="0.6"/>
+            <circle cx="44" cy="20" r="4" fill="#00FF94" opacity="0.6"/>
+          </svg>
+        </div>
+        <h2 class="empty-title">Ready to Analyze</h2>
+        <p class="empty-desc">Add 2–5 stock tickers, choose a time range,<br />then hit <strong>Analyze</strong> to generate your dashboard.</p>
+        <div class="empty-steps">
+          <div class="step"><span class="step-num">1</span> Add stocks in the sidebar</div>
+          <div class="step"><span class="step-num">2</span> Enter API key or use Demo Mode</div>
+          <div class="step"><span class="step-num">3</span> Click Analyze ⚡</div>
+        </div>
+      </div>
+
+      <!-- Chart: Price History (hidden until analyzed) -->
+      <div class="card card-full hidden" id="priceCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">LINE</span>
+            <h2 class="card-title">Price History &amp; Regression Trends</h2>
+          </div>
+          <div class="card-actions">
+            <label class="mini-toggle">
+              <input type="checkbox" id="showRegression" checked />
+              <span>Show Trend Lines</span>
+            </label>
+          </div>
+        </div>
+        <div class="chart-wrap" id="priceChart"></div>
+      </div>
+
+      <!-- Correlation Heatmap -->
+      <div class="card card-60 hidden" id="heatmapCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">HEATMAP</span>
+            <h2 class="card-title">Correlation Matrix</h2>
+          </div>
+        </div>
+        <div class="chart-wrap chart-wrap-sm" id="heatmapChart"></div>
+        <div class="heatmap-legend">
+          <span class="legend-neg">−1.0 Negative</span>
+          <div class="legend-grad"></div>
+          <span class="legend-pos">+1.0 Positive</span>
+        </div>
+      </div>
+
+      <!-- Risk Panel -->
+      <div class="card card-40 hidden" id="riskCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">RISK</span>
+            <h2 class="card-title">Volatility &amp; Risk</h2>
+          </div>
+        </div>
+        <div class="risk-grid" id="riskGrid"></div>
+        <div class="risk-note">
+          <span class="note-icon">ℹ</span>
+          Annualized volatility: Low &lt;15% · Medium 15–30% · High &gt;30%
+        </div>
+      </div>
+
+      <!-- Scatter Plot -->
+      <div class="card card-50 hidden" id="scatterCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">SCATTER</span>
+            <h2 class="card-title">Pair Scatter Plot</h2>
+          </div>
+        </div>
+        <div class="chart-wrap chart-wrap-sm" id="scatterChart"></div>
+        <div class="scatter-stats" id="scatterStats"></div>
+      </div>
+
+      <!-- Smart Insights -->
+      <div class="card card-50 hidden" id="insightsCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">AI</span>
+            <h2 class="card-title">Smart Financial Insights</h2>
+          </div>
+        </div>
+        <div class="insights-list" id="insightsList"></div>
+      </div>
+
+      <!-- Regression Stats Table -->
+      <div class="card card-full hidden" id="regressCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-badge">TABLE</span>
+            <h2 class="card-title">Regression Statistics</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="regressionTable">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Slope ($/day)</th>
+                <th>R² Fit</th>
+                <th>Trend</th>
+                <th>30-Day Projection</th>
+                <th>Annualized Vol</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody id="regressionTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /dashboard-grid -->
+
+    <!-- Error Toast -->
+    <div class="toast hidden" id="errorToast">
+      <span class="toast-icon">⚠</span>
+      <span class="toast-msg" id="toastMsg"></span>
+      <button class="toast-close" id="toastClose">✕</button>
+    </div>
+
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
